@@ -1,0 +1,206 @@
+import json   # Used to save/load tasks from a file
+import os     # Used to check if the save file already exists
+
+
+# ── Constants ────────────────────────────────────────────────
+# The name of the file where tasks will be saved.
+# Storing it as a constant means we only write it once.
+SAVE_FILE = "tasks.json"
+
+
+# ── File helpers ─────────────────────────────────────────────
+
+def load_tasks():
+    """
+    Load tasks from the JSON file and return them as a list.
+    If the file doesn't exist yet (first run), return an empty list.
+    
+    Each task is a dictionary with two keys:
+        "title"    — the text the user typed
+        "done"     — True if completed, False otherwise
+    """
+    if os.path.exists(SAVE_FILE):
+        with open(SAVE_FILE, "r") as file:
+            tasks = json.load(file)   # Convert JSON text → Python list
+        return tasks
+    else:
+        return []   # No save file yet — start fresh
+
+
+def save_tasks(tasks):
+    """
+    Save the current list of tasks to the JSON file.
+    Called after every change so nothing is lost if the program closes.
+    
+    json.dump() converts the Python list → readable JSON text.
+    indent=2 makes the file human-readable (nice formatting).
+    """
+    with open(SAVE_FILE, "w") as file:
+        json.dump(tasks, file, indent=2)
+
+
+# ── Core features ─────────────────────────────────────────────
+
+def add_task(tasks):
+    """
+    Ask the user for a task title and add it to the list.
+    New tasks start as not done (done = False).
+    """
+    title = input("Enter task title: ").strip()   # .strip() removes accidental spaces
+
+    if title == "":
+        print("  ⚠  Task title cannot be empty. Nothing was added.")
+        return
+
+    # Build a new task as a dictionary
+    new_task = {
+        "title": title,
+        "done": False
+    }
+
+    tasks.append(new_task)    # Add to the in-memory list
+    save_tasks(tasks)         # Write changes to disk immediately
+    print(f"  ✔  Task added: \"{title}\"")
+
+
+def view_tasks(tasks):
+    """
+    Print every task with its number, status, and title.
+    ✔ = completed   ○ = still to do
+    """
+    print()   # Blank line for readability
+
+    if len(tasks) == 0:
+        print("  No tasks yet! Add one from the main menu.")
+        return
+
+    print("  Your tasks:")
+    print("  " + "-" * 40)
+
+    # Loop through the list with enumerate so we have both
+    # the index (i) and the task dictionary at the same time.
+    for i, task in enumerate(tasks):
+        # Pick a symbol depending on whether the task is done
+        status = "✔" if task["done"] else "○"
+        # i + 1 so the list shows 1, 2, 3 instead of 0, 1, 2
+        print(f"  {i + 1}. [{status}] {task['title']}")
+
+    print("  " + "-" * 40)
+
+
+def mark_complete(tasks):
+    """
+    Show the task list, ask the user which number to mark as done,
+    then update that task's 'done' field to True.
+    """
+    view_tasks(tasks)
+
+    if len(tasks) == 0:
+        return   # Nothing to mark — view_tasks already said so
+
+    try:
+        # int() will raise ValueError if the user types something
+        # that isn't a number, which we catch below.
+        number = int(input("  Enter task number to mark complete: "))
+        index = number - 1   # Convert 1-based user input → 0-based list index
+
+        # Make sure the number is actually in range
+        if index < 0 or index >= len(tasks):
+            print("  ⚠  That number is not in the list.")
+            return
+
+        if tasks[index]["done"]:
+            print("  ℹ  That task is already marked complete.")
+        else:
+            tasks[index]["done"] = True
+            save_tasks(tasks)
+            print(f"  ✔  Marked complete: \"{tasks[index]['title']}\"")
+
+    except ValueError:
+        # The user typed something like "abc" instead of a number
+        print("  ⚠  Please enter a valid number.")
+
+
+def delete_task(tasks):
+    """
+    Show the task list, ask the user which number to delete,
+    then remove that task from the list.
+    """
+    view_tasks(tasks)
+
+    if len(tasks) == 0:
+        return
+
+    try:
+        number = int(input("  Enter task number to delete: "))
+        index = number - 1
+
+        if index < 0 or index >= len(tasks):
+            print("  ⚠  That number is not in the list.")
+            return
+
+        # pop() removes the item at the given index and returns it
+        removed = tasks.pop(index)
+        save_tasks(tasks)
+        print(f"  🗑  Deleted: \"{removed['title']}\"")
+
+    except ValueError:
+        print("  ⚠  Please enter a valid number.")
+
+
+# ── Menu & main loop ──────────────────────────────────────────
+
+def show_menu():
+    """
+    Print the main menu options.
+    Keeping this in its own function means we can call it
+    at the top of every loop without duplicating code.
+    """
+    print()
+    print("  ══════════════════════════")
+    print("       📝  To-Do List       ")
+    print("  ══════════════════════════")
+    print("  1. Add a task")
+    print("  2. View all tasks")
+    print("  3. Mark task as complete")
+    print("  4. Delete a task")
+    print("  5. Quit")
+    print()
+
+
+def main():
+    """
+    The entry point of the program.
+    Loads tasks once at startup, then runs an infinite loop
+    that shows the menu and calls the right function based
+    on the user's choice. The loop ends when the user picks 5.
+    """
+    tasks = load_tasks()   # Load any previously saved tasks
+
+    print("\n  Welcome to your To-Do List app!")
+
+    while True:   # Keep showing the menu until the user quits
+        show_menu()
+        choice = input("  Enter your choice (1–5): ").strip()
+
+        if choice == "1":
+            add_task(tasks)
+        elif choice == "2":
+            view_tasks(tasks)
+        elif choice == "3":
+            mark_complete(tasks)
+        elif choice == "4":
+            delete_task(tasks)
+        elif choice == "5":
+            print("\n  Goodbye! Your tasks have been saved. 👋\n")
+            break   # Exit the while loop → program ends
+        else:
+            print("  ⚠  Invalid choice. Please type a number from 1 to 5.")
+
+
+# ── Run the program ───────────────────────────────────────────
+# This block only runs when you execute the file directly
+# (e.g. `python todo.py`). It won't run if another file
+# imports this one — a good Python habit to build early.
+if __name__ == "__main__":
+    main()
